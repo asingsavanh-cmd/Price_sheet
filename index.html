@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Bannumhom — Fragrance Boutique</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet" />
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -20,8 +20,8 @@
     --muted:    #9c8e7e;
     --border:   rgba(139,108,62,0.15);
     --border2:  rgba(139,108,62,0.35);
-    --serif: 'DM Sans', sans-serif;
-    --sans:  'DM Sans', sans-serif;
+    --serif:    'Cormorant Garamond', Georgia, serif;
+    --sans:     'Jost', sans-serif;
     --shadow:   0 2px 18px rgba(100,80,40,0.08);
     --shadow2:  0 8px 40px rgba(100,80,40,0.14);
   }
@@ -540,9 +540,25 @@
   <strong id="product-count">3</strong> fragrances &nbsp;·&nbsp; All edits are live
 </footer>
 
+<!-- Firebase SDKs -->
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.0/firebase-app-compat.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.0/firebase-database-compat.min.js"></script>
+
 <script>
-const STORAGE_KEY = 'bannumhom_products';
-const META_KEY    = 'bannumhom_meta';
+// ── Firebase setup ──
+const firebaseConfig = {
+  apiKey: "AIzaSyB-to7SafIABX1J4kfQJLmHx1QHz-5AfDY",
+  authDomain: "bannumhom-pricesheet.firebaseapp.com",
+  databaseURL: "https://bannumhom-pricesheet-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "bannumhom-pricesheet",
+  storageBucket: "bannumhom-pricesheet.firebasestorage.app",
+  messagingSenderId: "582206449234",
+  appId: "1:582206449234:web:2ac63ea582d6748c7ca18b"
+};
+firebase.initializeApp(firebaseConfig);
+const db          = firebase.database();
+const productsRef = db.ref('products');
+const metaRef     = db.ref('meta');
 
 const defaultProducts = [
   { id: 1, name: "Noir Absolu",    price: "185,000", desc: "A deep, smoky blend of oud, black amber, and dark woods. Seductive and long-lasting — crafted for evenings that leave a mark.",    image: "https://images.unsplash.com/photo-1541643600914-78b084683702?w=500&q=80", tag: "Bestseller" },
@@ -550,37 +566,48 @@ const defaultProducts = [
   { id: 3, name: "Carte Blanche",  price: "210,000", desc: "Clean linen, soft musk, and a whisper of white cedar. The scent of quiet luxury — subtle, refined, unforgettable.",                 image: "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=500&q=80", tag: "Limited" },
 ];
 
-// ── Load from localStorage ──
-let saved = null;
-try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch(e) {}
-const products = (saved && saved.length) ? saved : defaultProducts.map(p => ({...p}));
-let nextId = products.reduce((m, p) => Math.max(m, p.id), 0) + 1;
+let products = [];
+let meta     = { name: 'Bannumhom', tagline: 'Rare fragrances, crafted for those who know.' };
+let nextId   = 1;
+let ready    = false;
 
-// ── Load store meta ──
-let meta = { name: 'Bannumhom', tagline: 'Rare fragrances, crafted for those who know.' };
-try { const m = JSON.parse(localStorage.getItem(META_KEY)); if (m) meta = m; } catch(e) {}
-
-// ── Persist helpers ──
-function persist() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(products)); } catch(e) {}
-}
-function persistMeta() {
-  try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch(e) {}
-}
-
-// ── Show save toast ──
-function showToast() {
+// ── Toast ──
+function showToast(msg) {
   let t = document.getElementById('save-toast');
   if (!t) {
     t = document.createElement('div');
     t.id = 'save-toast';
-    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#8b6c3e;color:#fff;font-family:Jost,sans-serif;font-size:12px;letter-spacing:0.1em;padding:8px 20px;border-radius:2px;opacity:0;transition:opacity 0.3s;pointer-events:none;z-index:999;text-transform:uppercase';
-    t.textContent = '✓ Saved';
+    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#8b6c3e;color:#fff;font-family:DM Sans,sans-serif;font-size:12px;letter-spacing:0.1em;padding:8px 20px;border-radius:2px;opacity:0;transition:opacity 0.3s;pointer-events:none;z-index:9999;text-transform:uppercase';
     document.body.appendChild(t);
   }
+  t.textContent = msg || '✓ Saved for everyone';
   t.style.opacity = 1;
   clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.style.opacity = 0, 1800);
+  t._timer = setTimeout(() => t.style.opacity = 0, 2000);
+}
+
+// ── Loading overlay ──
+function setLoading(on) {
+  let el = document.getElementById('loading-overlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'loading-overlay';
+    el.style.cssText = 'position:fixed;inset:0;background:#faf8f4;display:flex;align-items:center;justify-content:center;z-index:8888;flex-direction:column;gap:14px;font-family:DM Sans,sans-serif;color:#9c8e7e;font-size:13px;letter-spacing:0.12em;text-transform:uppercase';
+    el.innerHTML = '<div style="width:32px;height:32px;border:2px solid #e8dcc8;border-top-color:#8b6c3e;border-radius:50%;animation:spin 0.8s linear infinite"></div><span>Loading…</span>';
+    const style = document.createElement('style');
+    style.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
+    document.head.appendChild(style);
+    document.body.appendChild(el);
+  }
+  el.style.display = on ? 'flex' : 'none';
+}
+
+// ── Persist to Firebase ──
+function persist() {
+  productsRef.set(products);
+}
+function persistMeta() {
+  metaRef.set(meta);
 }
 
 function esc(s) {
@@ -589,7 +616,6 @@ function esc(s) {
 function updateCount() {
   document.getElementById('product-count').textContent = products.length;
 }
-
 function buildImgContent(url, name) {
   if (!url) return buildPlaceholder();
   return `<img src="${esc(url)}" alt="${esc(name)}" onload="this.style.opacity=1" onerror="handleImgError(this)" style="opacity:0;transition:opacity 0.4s" />`;
@@ -599,6 +625,7 @@ function buildPlaceholder() {
 }
 function handleImgError(img) {
   const wrap = img.parentElement;
+  if (!wrap) return;
   img.remove();
   const div = document.createElement('div');
   div.innerHTML = buildPlaceholder();
@@ -698,8 +725,6 @@ function applyImg(id) {
 // ── Store name & tagline ──
 const nameEl    = document.querySelector('.store-name');
 const taglineEl = document.querySelector('.store-tagline');
-nameEl.innerText    = meta.name;
-taglineEl.innerText = meta.tagline;
 nameEl.addEventListener('blur', () => {
   const v = nameEl.innerText.trim();
   if (v) { meta.name = v; persistMeta(); showToast(); }
@@ -734,7 +759,32 @@ document.getElementById('modal-confirm').onclick = () => {
 };
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
-render();
+// ── Firebase real-time listeners ──
+setLoading(true);
+
+metaRef.on('value', snap => {
+  const val = snap.val();
+  if (val) {
+    meta = val;
+    nameEl.innerText    = meta.name;
+    taglineEl.innerText = meta.tagline;
+  }
+});
+
+productsRef.on('value', snap => {
+  const val = snap.val();
+  if (val && Array.isArray(val) && val.length) {
+    products = val;
+  } else if (!val) {
+    // First time — seed with defaults
+    products = defaultProducts.map(p => ({...p}));
+    productsRef.set(products);
+    metaRef.set(meta);
+  }
+  nextId = products.reduce((m, p) => Math.max(m, p.id), 0) + 1;
+  render();
+  if (!ready) { ready = true; setLoading(false); }
+});
 </script>
 </body>
 </html>
