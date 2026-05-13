@@ -541,17 +541,51 @@
 </footer>
 
 <script>
-const products = [
-  { id: 1, name: "Noir Absolu",     price: "185,000",  desc: "A deep, smoky blend of oud, black amber, and dark woods. Seductive and long-lasting — crafted for evenings that leave a mark.",           image: "https://images.unsplash.com/photo-1541643600914-78b084683702?w=500&q=80", tag: "Bestseller" },
-  { id: 2, name: "Rose de Minuit",  price: "145,000",  desc: "Midnight rose kissed with bergamot and sandalwood. An intimate floral that blooms on the skin through the night.",                         image: "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?w=500&q=80", tag: "New" },
-  { id: 3, name: "Carte Blanche",   price: "210,000",  desc: "Clean linen, soft musk, and a whisper of white cedar. The scent of quiet luxury — subtle, refined, unforgettable.",                        image: "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=500&q=80", tag: "Limited" },
+const STORAGE_KEY = 'bannumhom_products';
+const META_KEY    = 'bannumhom_meta';
+
+const defaultProducts = [
+  { id: 1, name: "Noir Absolu",    price: "185,000", desc: "A deep, smoky blend of oud, black amber, and dark woods. Seductive and long-lasting — crafted for evenings that leave a mark.",    image: "https://images.unsplash.com/photo-1541643600914-78b084683702?w=500&q=80", tag: "Bestseller" },
+  { id: 2, name: "Rose de Minuit", price: "145,000", desc: "Midnight rose kissed with bergamot and sandalwood. An intimate floral that blooms on the skin through the night.",                  image: "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?w=500&q=80", tag: "New" },
+  { id: 3, name: "Carte Blanche",  price: "210,000", desc: "Clean linen, soft musk, and a whisper of white cedar. The scent of quiet luxury — subtle, refined, unforgettable.",                 image: "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=500&q=80", tag: "Limited" },
 ];
-let nextId = 4;
+
+// ── Load from localStorage ──
+let saved = null;
+try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch(e) {}
+const products = (saved && saved.length) ? saved : defaultProducts.map(p => ({...p}));
+let nextId = products.reduce((m, p) => Math.max(m, p.id), 0) + 1;
+
+// ── Load store meta ──
+let meta = { name: 'Bannumhom', tagline: 'Rare fragrances, crafted for those who know.' };
+try { const m = JSON.parse(localStorage.getItem(META_KEY)); if (m) meta = m; } catch(e) {}
+
+// ── Persist helpers ──
+function persist() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(products)); } catch(e) {}
+}
+function persistMeta() {
+  try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch(e) {}
+}
+
+// ── Show save toast ──
+function showToast() {
+  let t = document.getElementById('save-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'save-toast';
+    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#8b6c3e;color:#fff;font-family:Jost,sans-serif;font-size:12px;letter-spacing:0.1em;padding:8px 20px;border-radius:2px;opacity:0;transition:opacity 0.3s;pointer-events:none;z-index:999;text-transform:uppercase';
+    t.textContent = '✓ Saved';
+    document.body.appendChild(t);
+  }
+  t.style.opacity = 1;
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.style.opacity = 0, 1800);
+}
 
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
 function updateCount() {
   document.getElementById('product-count').textContent = products.length;
 }
@@ -560,18 +594,9 @@ function buildImgContent(url, name) {
   if (!url) return buildPlaceholder();
   return `<img src="${esc(url)}" alt="${esc(name)}" onload="this.style.opacity=1" onerror="handleImgError(this)" style="opacity:0;transition:opacity 0.4s" />`;
 }
-
 function buildPlaceholder() {
-  return `<div class="img-placeholder">
-    <svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
-      <rect x="3" y="3" width="18" height="18" rx="2"/>
-      <circle cx="8.5" cy="8.5" r="1.5"/>
-      <polyline points="21 15 16 10 5 21"/>
-    </svg>
-    <span>No image</span>
-  </div>`;
+  return `<div class="img-placeholder"><svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span>No image</span></div>`;
 }
-
 function handleImgError(img) {
   const wrap = img.parentElement;
   img.remove();
@@ -586,7 +611,7 @@ function renderCard(p, idx) {
     <button class="delete-btn" onclick="deleteProduct(${p.id})" title="Remove">✕</button>
     <div class="card-img-wrap" id="imgwrap-${p.id}">
       ${buildImgContent(p.image, p.name)}
-      ${p.tag ? `<span class="tag-badge" id="tag-badge-${p.id}">${esc(p.tag)}</span>` : `<span class="tag-badge" id="tag-badge-${p.id}" style="display:none"></span>`}
+      <span class="tag-badge" id="tag-badge-${p.id}" style="${p.tag?'':'display:none'}">${esc(p.tag||'')}</span>
       <button class="img-change-btn" onclick="openImgBar(${p.id})">⊕ Change image</button>
     </div>
     <div class="img-url-bar" id="imgbar-${p.id}">
@@ -612,11 +637,7 @@ function renderCard(p, idx) {
 
 function renderAddBtn() {
   return `<div class="add-card" onclick="openModal()">
-    <svg width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="10"/>
-      <line x1="12" y1="8" x2="12" y2="16"/>
-      <line x1="8" y1="12" x2="16" y2="12"/>
-    </svg>
+    <svg width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
     <span>Add Fragrance</span>
   </div>`;
 }
@@ -630,7 +651,8 @@ function saveField(id, field, el) {
   const p = products.find(x => x.id === id);
   if (!p) return;
   const val = el.innerText.trim();
-  if (val) p[field] = val; else el.innerText = p[field];
+  if (val) { p[field] = val; persist(); showToast(); }
+  else el.innerText = p[field];
 }
 
 function saveTag(id, el) {
@@ -639,16 +661,15 @@ function saveTag(id, el) {
   const val = el.innerText.trim();
   p.tag = (val === 'Add tag…') ? '' : val;
   const badge = document.getElementById('tag-badge-' + id);
-  if (badge) {
-    badge.textContent = p.tag;
-    badge.style.display = p.tag ? '' : 'none';
-  }
+  if (badge) { badge.textContent = p.tag; badge.style.display = p.tag ? '' : 'none'; }
+  persist(); showToast();
 }
 
 function deleteProduct(id) {
   const idx = products.findIndex(p => p.id === id);
   if (idx < 0) return;
   products.splice(idx, 1);
+  persist(); showToast();
   render();
 }
 
@@ -671,9 +692,26 @@ function applyImg(id) {
   tmp.innerHTML = buildImgContent(url, p.name);
   wrap.insertBefore(tmp.firstElementChild || tmp.firstChild, wrap.querySelector('.img-change-btn'));
   closeImgBar(id);
+  persist(); showToast();
 }
 
-// Modal
+// ── Store name & tagline ──
+const nameEl    = document.querySelector('.store-name');
+const taglineEl = document.querySelector('.store-tagline');
+nameEl.innerText    = meta.name;
+taglineEl.innerText = meta.tagline;
+nameEl.addEventListener('blur', () => {
+  const v = nameEl.innerText.trim();
+  if (v) { meta.name = v; persistMeta(); showToast(); }
+  else nameEl.innerText = meta.name;
+});
+taglineEl.addEventListener('blur', () => {
+  const v = taglineEl.innerText.trim();
+  if (v) { meta.tagline = v; persistMeta(); showToast(); }
+  else taglineEl.innerText = meta.tagline;
+});
+
+// ── Modal ──
 function openModal() {
   ['f-name','f-price','f-desc','f-img','f-tag'].forEach(id => { document.getElementById(id).value = ''; document.getElementById(id).style.borderColor = ''; });
   document.getElementById('modal-overlay').classList.add('open');
@@ -689,15 +727,9 @@ document.getElementById('modal-confirm').onclick = () => {
   const price = document.getElementById('f-price').value.trim();
   if (!name)  { document.getElementById('f-name').style.borderColor  = '#c0605a'; document.getElementById('f-name').focus(); return; }
   if (!price) { document.getElementById('f-price').style.borderColor = '#c0605a'; document.getElementById('f-price').focus(); return; }
-  products.push({
-    id: nextId++,
-    name,
-    price,
-    desc:  document.getElementById('f-desc').value.trim() || 'A beautiful new fragrance.',
-    image: document.getElementById('f-img').value.trim(),
-    tag:   document.getElementById('f-tag').value.trim()
-  });
+  products.push({ id: nextId++, name, price, desc: document.getElementById('f-desc').value.trim() || 'A beautiful new fragrance.', image: document.getElementById('f-img').value.trim(), tag: document.getElementById('f-tag').value.trim() });
   closeModal();
+  persist(); showToast();
   render();
 };
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
