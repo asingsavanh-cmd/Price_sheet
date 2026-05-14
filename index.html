@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Bannumhom — Fragrance Boutique</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300;1,9..40,400&display=swap" rel="stylesheet" />
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -20,8 +20,8 @@
     --muted:    #9c8e7e;
     --border:   rgba(139,108,62,0.15);
     --border2:  rgba(139,108,62,0.35);
-    --serif: 'DM Sans', sans-serif;
-    --sans:  'DM Sans', sans-serif;
+    --serif:    'DM Sans', sans-serif;
+    --sans:     'DM Sans', sans-serif;
     --shadow:   0 2px 18px rgba(100,80,40,0.08);
     --shadow2:  0 8px 40px rgba(100,80,40,0.14);
   }
@@ -90,6 +90,72 @@
     letter-spacing: 0.07em;
   }
   .edit-hint em { color: var(--accent); font-style: normal; }
+
+  /* ── Lock button ── */
+  .lock-btn {
+    position: absolute;
+    top: 18px; right: 18px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    color: var(--accent);
+    border-radius: 50px;
+    padding: 7px 14px;
+    font-family: var(--sans);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    transition: background 0.2s, border-color 0.2s;
+    z-index: 10;
+  }
+  .lock-btn:hover { background: var(--bg4); border-color: var(--accent); }
+  .lock-btn.unlocked { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .lock-btn.unlocked:hover { background: #a07840; }
+
+  /* ── View-only mode ── */
+  body.view-only [contenteditable] {
+    border-bottom: none !important;
+    cursor: default !important;
+    pointer-events: none;
+  }
+  body.view-only .delete-btn,
+  body.view-only .img-change-btn,
+  body.view-only .add-card,
+  body.view-only .edit-hint { display: none !important; }
+  body.view-only .card-footer { border-top: none; padding-top: 0; }
+  body.view-only .tag-inline { pointer-events: none; border-bottom: none; }
+
+  /* ── Password modal ── */
+  .pw-modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(20,15,10,0.5);
+    z-index: 500; align-items: center; justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  .pw-modal-overlay.open { display: flex; }
+  .pw-modal {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    padding: 36px 36px 28px;
+    width: 380px; max-width: calc(100vw - 40px);
+    box-shadow: var(--shadow2);
+    animation: modalIn 0.2s ease;
+  }
+  .pw-modal h2 { font-family: var(--serif); font-size: 26px; font-weight: 300; color: var(--text); margin-bottom: 6px; letter-spacing: 0.04em; }
+  .pw-modal p { font-size: 13px; color: var(--muted); margin-bottom: 22px; line-height: 1.6; }
+  .pw-modal input {
+    width: 100%; padding: 10px 12px;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 2px; color: var(--text);
+    font-family: var(--sans); font-size: 15px; outline: none;
+    transition: border-color 0.2s; margin-bottom: 6px; box-sizing: border-box;
+  }
+  .pw-modal input:focus { border-color: var(--accent); background: var(--bg2); }
+  .pw-modal input.error { border-color: #c0605a; }
+  .pw-error-msg { font-size: 12px; color: #c0605a; margin-bottom: 16px; min-height: 18px; }
+  .pw-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
 
   /* ── Grid ── */
   .grid {
@@ -514,12 +580,30 @@
   <div class="header-deco"><span class="eyebrow">Fragrance Boutique</span></div>
   <div class="store-name" contenteditable="true" spellcheck="false" title="Click to edit">Bannumhom</div>
   <div class="store-tagline" contenteditable="true" spellcheck="false" title="Click to edit">Rare fragrances, crafted for those who know.</div>
+  <button class="lock-btn" id="lock-btn" onclick="handleLockClick()">
+    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    <span id="lock-label">Admin Login</span>
+  </button>
   <p class="edit-hint"><em>✦</em> Click any text to edit &nbsp;·&nbsp; Hover a card to change its image <em>✦</em></p>
 </header>
 
 <div class="section-divider">Our Collection</div>
 
 <main class="grid" id="grid"></main>
+
+<!-- Password modal -->
+<div class="pw-modal-overlay" id="pw-modal-overlay">
+  <div class="pw-modal">
+    <h2 id="pw-modal-title">Admin Login</h2>
+    <p id="pw-modal-desc">Enter your password to unlock editing.</p>
+    <input type="password" id="pw-input" placeholder="Password" onkeydown="if(event.key==='Enter')submitPassword()" />
+    <div class="pw-error-msg" id="pw-error"></div>
+    <div class="pw-modal-actions">
+      <button class="btn-cancel" onclick="closePwModal()">Cancel</button>
+      <button class="btn-add" onclick="submitPassword()">Unlock</button>
+    </div>
+  </div>
+</div>
 
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal">
@@ -559,6 +643,7 @@ firebase.initializeApp(firebaseConfig);
 const db          = firebase.database();
 const productsRef = db.ref('products');
 const metaRef     = db.ref('meta');
+const authRef     = db.ref('auth');
 
 const defaultProducts = [
   { id: 1, name: "Noir Absolu",    price: "185,000", desc: "A deep, smoky blend of oud, black amber, and dark woods. Seductive and long-lasting — crafted for evenings that leave a mark.",    image: "https://images.unsplash.com/photo-1541643600914-78b084683702?w=500&q=80", tag: "Bestseller" },
@@ -566,10 +651,102 @@ const defaultProducts = [
   { id: 3, name: "Carte Blanche",  price: "210,000", desc: "Clean linen, soft musk, and a whisper of white cedar. The scent of quiet luxury — subtle, refined, unforgettable.",                 image: "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=500&q=80", tag: "Limited" },
 ];
 
-let products = [];
-let meta     = { name: 'Bannumhom', tagline: 'Rare fragrances, crafted for those who know.' };
-let nextId   = 1;
-let ready    = false;
+let products   = [];
+let meta       = { name: 'Bannumhom', tagline: 'Rare fragrances, crafted for those who know.' };
+let nextId     = 1;
+let ready      = false;
+let adminPw    = null;   // loaded from Firebase
+let isUnlocked = false;
+
+// ── Auth state ──
+function setEditMode(on) {
+  isUnlocked = on;
+  document.body.classList.toggle('view-only', !on);
+  const btn   = document.getElementById('lock-btn');
+  const label = document.getElementById('lock-label');
+  if (on) {
+    btn.classList.add('unlocked');
+    label.textContent = 'Lock editing';
+  } else {
+    btn.classList.remove('unlocked');
+    label.textContent = 'Admin Login';
+  }
+}
+
+function handleLockClick() {
+  if (isUnlocked) {
+    setEditMode(false);
+    showToast('🔒 Editing locked');
+  } else {
+    openPwModal();
+  }
+}
+
+// ── Password modal ──
+function openPwModal() {
+  const overlay = document.getElementById('pw-modal-overlay');
+  const input   = document.getElementById('pw-input');
+  const title   = document.getElementById('pw-modal-title');
+  const desc    = document.getElementById('pw-modal-desc');
+  document.getElementById('pw-error').textContent = '';
+  input.value = '';
+  input.classList.remove('error');
+
+  if (!adminPw) {
+    title.textContent = 'Set Admin Password';
+    desc.textContent  = 'No password set yet. Enter a password to protect this store.';
+  } else {
+    title.textContent = 'Admin Login';
+    desc.textContent  = 'Enter your password to unlock editing.';
+  }
+
+  overlay.classList.add('open');
+  setTimeout(() => input.focus(), 80);
+}
+
+function closePwModal() {
+  document.getElementById('pw-modal-overlay').classList.remove('open');
+}
+
+function submitPassword() {
+  const input = document.getElementById('pw-input');
+  const pw    = input.value.trim();
+  const errEl = document.getElementById('pw-error');
+
+  if (!pw) {
+    input.classList.add('error');
+    errEl.textContent = 'Please enter a password.';
+    return;
+  }
+
+  if (!adminPw) {
+    // First time — set the password
+    authRef.set({ password: pw }).then(() => {
+      adminPw = pw;
+      closePwModal();
+      setEditMode(true);
+      showToast('✓ Password set — editing unlocked');
+    });
+  } else {
+    if (pw === adminPw) {
+      closePwModal();
+      setEditMode(true);
+      showToast('✓ Editing unlocked');
+    } else {
+      input.classList.add('error');
+      errEl.textContent = 'Wrong password. Try again.';
+      input.value = '';
+      setTimeout(() => input.focus(), 50);
+    }
+  }
+}
+
+document.getElementById('pw-modal-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closePwModal();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closePwModal(); closeModal(); }
+});
 
 // ── Toast ──
 function showToast(msg) {
@@ -577,7 +754,7 @@ function showToast(msg) {
   if (!t) {
     t = document.createElement('div');
     t.id = 'save-toast';
-    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#8b6c3e;color:#fff;font-family:DM Sans,sans-serif;font-size:12px;letter-spacing:0.1em;padding:8px 20px;border-radius:2px;opacity:0;transition:opacity 0.3s;pointer-events:none;z-index:9999;text-transform:uppercase';
+    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#8b6c3e;color:#fff;font-family:sans-serif;font-size:12px;letter-spacing:0.1em;padding:8px 20px;border-radius:2px;opacity:0;transition:opacity 0.3s;pointer-events:none;z-index:9999;text-transform:uppercase;white-space:nowrap';
     document.body.appendChild(t);
   }
   t.textContent = msg || '✓ Saved for everyone';
@@ -592,7 +769,7 @@ function setLoading(on) {
   if (!el) {
     el = document.createElement('div');
     el.id = 'loading-overlay';
-    el.style.cssText = 'position:fixed;inset:0;background:#faf8f4;display:flex;align-items:center;justify-content:center;z-index:8888;flex-direction:column;gap:14px;font-family:DM Sans,sans-serif;color:#9c8e7e;font-size:13px;letter-spacing:0.12em;text-transform:uppercase';
+    el.style.cssText = 'position:fixed;inset:0;background:#faf8f4;display:flex;align-items:center;justify-content:center;z-index:8888;flex-direction:column;gap:14px;font-family:sans-serif;color:#9c8e7e;font-size:13px;letter-spacing:0.12em;text-transform:uppercase';
     el.innerHTML = '<div style="width:32px;height:32px;border:2px solid #e8dcc8;border-top-color:#8b6c3e;border-radius:50%;animation:spin 0.8s linear infinite"></div><span>Loading…</span>';
     const style = document.createElement('style');
     style.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
@@ -602,13 +779,15 @@ function setLoading(on) {
   el.style.display = on ? 'flex' : 'none';
 }
 
+// ── Guard edit actions ──
+function requireAuth(fn) {
+  if (!isUnlocked) { openPwModal(); return; }
+  fn();
+}
+
 // ── Persist to Firebase ──
-function persist() {
-  productsRef.set(products);
-}
-function persistMeta() {
-  metaRef.set(meta);
-}
+function persist() { productsRef.set(products); }
+function persistMeta() { metaRef.set(meta); }
 
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -635,11 +814,11 @@ function handleImgError(img) {
 function renderCard(p, idx) {
   return `
   <div class="card" id="card-${p.id}" style="animation-delay:${idx*0.07}s">
-    <button class="delete-btn" onclick="deleteProduct(${p.id})" title="Remove">✕</button>
+    <button class="delete-btn" onclick="requireAuth(()=>deleteProduct(${p.id}))" title="Remove">✕</button>
     <div class="card-img-wrap" id="imgwrap-${p.id}">
       ${buildImgContent(p.image, p.name)}
       <span class="tag-badge" id="tag-badge-${p.id}" style="${p.tag?'':'display:none'}">${esc(p.tag||'')}</span>
-      <button class="img-change-btn" onclick="openImgBar(${p.id})">⊕ Change image</button>
+      <button class="img-change-btn" onclick="requireAuth(()=>openImgBar(${p.id}))">⊕ Change image</button>
     </div>
     <div class="img-url-bar" id="imgbar-${p.id}">
       <input type="text" id="imgurl-${p.id}" placeholder="Paste image URL…" value="${esc(p.image||'')}" onkeydown="if(event.key==='Enter')applyImg(${p.id})" />
@@ -656,14 +835,14 @@ function renderCard(p, idx) {
       </div>
       <div class="product-desc" contenteditable="true" spellcheck="false" onblur="saveField(${p.id},'desc',this)">${esc(p.desc)}</div>
       <div class="card-footer">
-        <span class="tag-inline" contenteditable="true" spellcheck="false" onblur="saveTag(${p.id},this)" title="Click to edit tag">${esc(p.tag||'Add tag…')}</span>
+        <span class="tag-inline" contenteditable="true" spellcheck="false" onblur="saveTag(${p.id},this)">${esc(p.tag||'Add tag…')}</span>
       </div>
     </div>
   </div>`;
 }
 
 function renderAddBtn() {
-  return `<div class="add-card" onclick="openModal()">
+  return `<div class="add-card" onclick="requireAuth(openModal)">
     <svg width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
     <span>Add Fragrance</span>
   </div>`;
@@ -675,6 +854,7 @@ function render() {
 }
 
 function saveField(id, field, el) {
+  if (!isUnlocked) { el.innerText = products.find(x=>x.id===id)?.[field] || ''; return; }
   const p = products.find(x => x.id === id);
   if (!p) return;
   const val = el.innerText.trim();
@@ -683,6 +863,7 @@ function saveField(id, field, el) {
 }
 
 function saveTag(id, el) {
+  if (!isUnlocked) { el.innerText = products.find(x=>x.id===id)?.tag || 'Add tag…'; return; }
   const p = products.find(x => x.id === id);
   if (!p) return;
   const val = el.innerText.trim();
@@ -726,17 +907,19 @@ function applyImg(id) {
 const nameEl    = document.querySelector('.store-name');
 const taglineEl = document.querySelector('.store-tagline');
 nameEl.addEventListener('blur', () => {
+  if (!isUnlocked) { nameEl.innerText = meta.name; return; }
   const v = nameEl.innerText.trim();
   if (v) { meta.name = v; persistMeta(); showToast(); }
   else nameEl.innerText = meta.name;
 });
 taglineEl.addEventListener('blur', () => {
+  if (!isUnlocked) { taglineEl.innerText = meta.tagline; return; }
   const v = taglineEl.innerText.trim();
   if (v) { meta.tagline = v; persistMeta(); showToast(); }
   else taglineEl.innerText = meta.tagline;
 });
 
-// ── Modal ──
+// ── Add product modal ──
 function openModal() {
   ['f-name','f-price','f-desc','f-img','f-tag'].forEach(id => { document.getElementById(id).value = ''; document.getElementById(id).style.borderColor = ''; });
   document.getElementById('modal-overlay').classList.add('open');
@@ -748,6 +931,7 @@ function closeModal() {
 document.getElementById('modal-cancel').onclick = closeModal;
 document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
 document.getElementById('modal-confirm').onclick = () => {
+  if (!isUnlocked) return;
   const name  = document.getElementById('f-name').value.trim();
   const price = document.getElementById('f-price').value.trim();
   if (!name)  { document.getElementById('f-name').style.borderColor  = '#c0605a'; document.getElementById('f-name').focus(); return; }
@@ -757,10 +941,15 @@ document.getElementById('modal-confirm').onclick = () => {
   persist(); showToast();
   render();
 };
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
 // ── Firebase real-time listeners ──
 setLoading(true);
+setEditMode(false); // start locked
+
+authRef.once('value', snap => {
+  const val = snap.val();
+  adminPw = val ? val.password : null;
+});
 
 metaRef.on('value', snap => {
   const val = snap.val();
@@ -776,7 +965,6 @@ productsRef.on('value', snap => {
   if (val && Array.isArray(val) && val.length) {
     products = val;
   } else if (!val) {
-    // First time — seed with defaults
     products = defaultProducts.map(p => ({...p}));
     productsRef.set(products);
     metaRef.set(meta);
